@@ -30,27 +30,31 @@ import scipy.io.wavfile as wav
 from scipy.fftpack import fft
 
 # Neural Network imports
-import keras
-from keras.utils.generic_utils import get_custom_objects
-from keras import backend as K
-from keras import regularizers, callbacks
-from keras.constraints import max_norm
-from keras.models import Model, Sequential, load_model
-from keras.layers import Input, Lambda, Dense, Dropout, Flatten, Embedding, merge, Activation, GRUCell, LSTMCell,SimpleRNNCell
-from keras.layers import Convolution2D, MaxPooling2D, Convolution1D, Conv1D, SimpleRNN, GRU, LSTM, CuDNNLSTM, CuDNNGRU, Conv2D
-from keras.layers.advanced_activations import LeakyReLU, PReLU, ThresholdedReLU, ELU
-from keras.layers import LeakyReLU, PReLU, ThresholdedReLU, ELU
-from keras.layers import BatchNormalization, TimeDistributed, Bidirectional
-from keras.layers import activations, Wrapper
-from keras.regularizers import l2
-from keras.optimizers import Adam, SGD, RMSprop, Adagrad, Adadelta, Adamax, Nadam
-from keras.callbacks import ModelCheckpoint 
-from keras.utils import np_utils
-from keras import constraints, initializers, regularizers
-from keras.engine.topology import Layer
-import keras.losses
-from keras.backend.tensorflow_backend import set_session
-from keras.engine import InputSpec
+import tensorflow.keras
+from tensorflow.python.keras.utils.generic_utils import get_custom_objects
+from tensorflow.keras import backend as K
+from tensorflow.keras import regularizers, callbacks
+from tensorflow.keras.constraints import max_norm
+from tensorflow.keras.models import Model, Sequential, load_model
+import tensorflow.keras.layers
+from tensorflow.compat.v1.keras.layers import Input, Lambda, Dense, Dropout, Flatten, Embedding, Activation, GRUCell, LSTMCell,SimpleRNNCell
+from tensorflow.compat.v1.keras.layers import Convolution2D, MaxPooling2D, Convolution1D, Conv1D, SimpleRNN, GRU, LSTM, CuDNNLSTM, CuDNNGRU, Conv2D
+from tensorflow.compat.v1.keras.layers import LeakyReLU, PReLU, ThresholdedReLU, ELU
+from tensorflow.compat.v1.keras.layers import BatchNormalization, TimeDistributed, Bidirectional
+from tensorflow.keras.layers import Wrapper
+from tensorflow.keras import activations
+
+from tensorflow.keras.regularizers import l2
+from tensorflow.keras.optimizers import Adam, SGD, RMSprop, Adagrad, Adadelta, Adamax, Nadam
+from tensorflow.keras.callbacks import ModelCheckpoint 
+import np_utils # from tensorflow.keras.utils import np_utils
+from tensorflow.keras import constraints, initializers, regularizers
+# from tensorflow.keras.engine.topology import Layer
+# from tensorflow.python.keras.engine import InputSpec
+from tensorflow.keras.layers import Layer, InputSpec
+import tensorflow.keras.losses
+# from tensorflow.keras.backend.tensorflow_backend import set_session
+from tensorflow.compat.v1.keras.backend import set_session
 import tensorflow as tf 
 from tensorflow.python.framework import graph_io
 from tensorflow.python.tools import freeze_graph
@@ -78,7 +82,7 @@ np.random.seed(95)
 RNG_SEED = 95
 
 # Suppressing some of Tensorflow's warnings
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 
 # Function for shuffling data
 def shuffle_dataset(audio_paths, durations, texts):
@@ -161,7 +165,7 @@ def calc_feat_dim(window, max_freq):
 
 class AudioGenerator():
     def __init__(self, step=10, window=20, max_freq=8000, mfcc_dim=13,
-        minibatch_size=20, desc_file=None, spectrogram=True, max_duration=10.0, 
+        minibatch_size=1, desc_file=None, spectrogram=True, max_duration=10.0, 
         sort_by_duration=False):
         # Initializing variables
         self.feat_dim = calc_feat_dim(window, max_freq)
@@ -316,6 +320,7 @@ class AudioGenerator():
                     audio_paths.append(spec['key'])
                     durations.append(float(spec['duration']))
                     texts.append(spec['text'])
+#                     print('Success reading line #{}'.format(line_num))
                 except Exception as e:
                     print('Error reading line #{}: {}'
                                 .format(line_num, json_line))
@@ -494,11 +499,11 @@ def train_model(input_to_softmax,
                 save_model_path,
                 train_json='train_corpus.json',
                 valid_json='valid_corpus.json',
-                minibatch_size=16, # You will want to change this depending on the GPU you are training on
+                minibatch_size=1, # You will want to change this depending on the GPU you are training on
                 spectrogram=True,
                 mfcc_dim=13,
                 optimizer=Adam(lr=0.001, beta_1=0.9, beta_2=0.999, epsilon=None, decay=0.0, amsgrad=False, clipnorm=1, clipvalue=.5),
-                epochs=30, # You will want to change this depending on the model you are training and data you are using
+                epochs=5, # You will want to change this depending on the model you are training and data you are using
                 verbose=1,
                 sort_by_duration=False,
                 max_duration=10.0):
@@ -528,7 +533,7 @@ def train_model(input_to_softmax,
     terminator = callbacks.TerminateOnNaN()
     time_machiner = callbacks.History()
     logger = callbacks.CSVLogger('training.log')
-    tensor_boarder = callbacks.TensorBoard(log_dir='./logs', batch_size=16,
+    tensor_boarder = callbacks.TensorBoard(log_dir='./logs', batch_size=1,
                                            write_graph=True, write_grads=True, write_images=True,)
     # Fit/train model
     hist = model.fit_generator(generator=audio_gen.next_train(), steps_per_epoch=steps_per_epoch,
@@ -540,12 +545,41 @@ def train_model(input_to_softmax,
 
 # Creating a TensorFlow session
 from keras.backend.tensorflow_backend import set_session
-config = tf.ConfigProto()
-config.gpu_options.per_process_gpu_memory_fraction = 1.0
-set_session(tf.Session(config=config))
+config = tf.compat.v1.ConfigProto()
+# # config.gpu_options.allow_growth = True # allow additional memory
+# config.gpu_options.per_process_gpu_memory_fraction = 0.6
+# set_session(tf.compat.v1.Session(config=config))
+
+# if tf.config.list_physical_devices('GPU'):
+#     physical_devices = tf.config.list_physical_devices('GPU')
+#     tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
+#     tf.config.experimental.set_virtual_device_configuration(physical_devices[0], [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4000)])
+
+# # Runtime allocate memory
+# gpus = tf.config.experimental.list_physical_devices('GPU')
+# if gpus:
+#     try:
+#         for gpu in gpus:
+#             tf.config.experimental.set_memory_growth(gpu,True)
+#         logical_gpus = tf.config.experimental.list_logical_devices('GPU')
+#         print(len(gpus), "Physical GPUs,", len(logical_gpus), "Logical GPUs")
+#     except RuntimeError as e:
+#             print(e)
+
+# mapping in start, but limit memory
+gpus = tf.config.experimental.list_physical_devices('GPU')
+if gpus:
+    try:
+        tf.config.experimental.set_virtual_device_configuration(
+            gpus[0],
+            [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=4096)]
+        )
+    except RuntimeError as e:
+        print(e)
+
 
 # Class for attention mechanism
-class Attention(keras.layers.Layer):
+class Attention(tensorflow.keras.layers.Layer):
 
     ATTENTION_TYPE_ADD = 'additive'
     ATTENTION_TYPE_MUL = 'multiplicative'
@@ -601,15 +635,15 @@ class Attention(keras.layers.Layer):
 
         self.use_additive_bias = use_additive_bias
         self.use_attention_bias = use_attention_bias
-        self.kernel_initializer = keras.initializers.get(kernel_initializer)
-        self.bias_initializer = keras.initializers.get(bias_initializer)
-        self.kernel_regularizer = keras.regularizers.get(kernel_regularizer)
-        self.bias_regularizer = keras.regularizers.get(bias_regularizer)
-        self.kernel_constraint = keras.constraints.get(kernel_constraint)
-        self.bias_constraint = keras.constraints.get(bias_constraint)
-        self.attention_activation = keras.activations.get(attention_activation)
+        self.kernel_initializer = tensorflow.keras.initializers.get(kernel_initializer)
+        self.bias_initializer = tensorflow.keras.initializers.get(bias_initializer)
+        self.kernel_regularizer = tensorflow.keras.regularizers.get(kernel_regularizer)
+        self.bias_regularizer = tensorflow.keras.regularizers.get(bias_regularizer)
+        self.kernel_constraint = tensorflow.keras.constraints.get(kernel_constraint)
+        self.bias_constraint = tensorflow.keras.constraints.get(bias_constraint)
+        self.attention_activation = tensorflow.keras.activations.get(attention_activation)
         self.attention_regularizer_weight = attention_regularizer_weight
-        self._backend = keras.backend.backend()
+        self._backend = tensorflow.keras.backend.backend()
 
         if attention_type == Attention.ATTENTION_TYPE_ADD:
             self.Wx, self.Wt, self.bh = None, None, None
@@ -628,13 +662,13 @@ class Attention(keras.layers.Layer):
             'history_only': self.history_only,
             'use_additive_bias': self.use_additive_bias,
             'use_attention_bias': self.use_attention_bias,
-            'kernel_initializer': keras.regularizers.serialize(self.kernel_initializer),
-            'bias_initializer': keras.regularizers.serialize(self.bias_initializer),
-            'kernel_regularizer': keras.regularizers.serialize(self.kernel_regularizer),
-            'bias_regularizer': keras.regularizers.serialize(self.bias_regularizer),
-            'kernel_constraint': keras.constraints.serialize(self.kernel_constraint),
-            'bias_constraint': keras.constraints.serialize(self.bias_constraint),
-            'attention_activation': keras.activations.serialize(self.attention_activation),
+            'kernel_initializer': tensorflow.keras.regularizers.serialize(self.kernel_initializer),
+            'bias_initializer': tensorflow.keras.regularizers.serialize(self.bias_initializer),
+            'kernel_regularizer': tensorflow.keras.regularizers.serialize(self.kernel_regularizer),
+            'bias_regularizer': tensorflow.keras.regularizers.serialize(self.bias_regularizer),
+            'kernel_constraint': tensorflow.keras.constraints.serialize(self.kernel_constraint),
+            'bias_constraint': tensorflow.keras.constraints.serialize(self.bias_constraint),
+            'attention_activation': tensorflow.keras.activations.serialize(self.attention_activation),
             'attention_regularizer_weight': self.attention_regularizer_weight,
         }
         base_config = super(Attention, self).get_config()
@@ -822,7 +856,7 @@ def keras_model(input_dim, filters, activation, kernel_size, conv_stride,
     model = Model(inputs=input_data, outputs=y_pred)
     model.output_length = lambda x: cnn_output_length(
         x, kernel_size, conv_border_mode, conv_stride)
-    print(model.summary())
+#     print(model.summary())
     return model
 
 hey_jetson = keras_model(input_dim=161, # 161 for Spectrogram/13 for MFCC
@@ -840,4 +874,3 @@ train_model(input_to_softmax=hey_jetson,
             pickle_path='model_11.pickle', 
             save_model_path='model_11.h5', 
             spectrogram=True) # True for Spectrogram/False for MFCC
-            
